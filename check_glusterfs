@@ -68,24 +68,26 @@ Exit () {
 
 # check for commands
 for cmd in basename bc awk sudo pidof gluster; do
-	if ! type -p "$cmd" >/dev/null; then
-		Exit UNKNOWN "$cmd not found"
-	fi
+  if path=$(command -v $cmd); then
+    eval full_path_$cmd=$path
+  else
+    Exit UNKNOWN "$cmd not found"
+  fi
 done
 
 # check for glusterd (management daemon)
-if ! pidof glusterd &>/dev/null; then
+if ! ${full_path_pidof} glusterd &>/dev/null; then
 	Exit CRITICAL "glusterd management daemon not running"
 fi
 
 # check for glusterfsd (brick daemon)
-if ! pidof glusterfsd &>/dev/null; then
+if ! ${full_path_pidof} glusterfsd &>/dev/null; then
 	Exit CRITICAL "glusterfsd brick daemon not running"
 fi
 
 # get volume heal status
 heal=0
-for entries in $(sudo gluster volume heal ${VOLUME} info | awk '/^Number of entries: /{print $4}'); do
+for entries in $(sudo ${full_path_gluster} volume heal ${VOLUME} info | ${full_path_awk} '/^Number of entries: /{print $4}'); do
 	if [[ $entries -gt 0 ]]; then
 		let heal+=entries
 	fi
@@ -117,7 +119,7 @@ while read -r line; do
 			if [[ $unit != "GB" ]]; then
 				Exit UNKNOWN "unknown disk space size $freeunit"
 			fi
-			free=$(bc -q <<<"$free / 1")
+			free=$(${full_path_bc} -q <<<"$free / 1")
 			if [[ $free -lt $freegb ]]; then
 				freegb=$free
 			fi
@@ -132,7 +134,7 @@ while read -r line; do
 		fi
 		;;
 	esac
-done < <(sudo gluster volume status ${VOLUME} detail)
+done < <(sudo ${full_path_gluster} volume status ${VOLUME} detail)
 
 if [[ $bricksfound -eq 0 ]]; then
 	Exit CRITICAL "no bricks found"
